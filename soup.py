@@ -75,7 +75,11 @@ def get_chapter_title(chapter):
         return None
 
 
-def send_notification(manga_dict, latest_chapter_dict):
+def send_notification(manga_dict, latest_chapter_dict, email_configs):
+    sender_email = email_configs['sender']
+    receiver_email = email_configs['receiver']
+    email_password = email_configs['password']
+
     try:
         message = MIMEMultipart()
         message['Subject'] = f'A WILD {manga_dict["title"].upper()} MANGA APPEARED! 👾'
@@ -100,56 +104,67 @@ def send_notification(manga_dict, latest_chapter_dict):
         return True
 
 
-# Loading configs and storage
-storage_usage, storage_location, sender_email, receiver_email, email_password = load_configs()
-if storage_usage:
-    notification_cache = load_cache_file(storage_location)
-    print('Loaded cache object:')
-    print(notification_cache)
+def main():
+    # Loading configs and storage
+    storage_usage, storage_location, sender_email, receiver_email, email_password = load_configs()
+    email_configs = { "sender": sender_email, "receiver": receiver_email, "password": email_password }
+    if storage_usage:
+        notification_cache = load_cache_file(storage_location)
+        print('Loaded cache object:')
+        print(notification_cache)
 
 
-for path in os.listdir(html_dir_path):
-    try:
-        html = open(os.path.join(html_dir_path, path), encoding="utf8")
-        soup = BeautifulSoup(html, 'html.parser')
-    except Exception as e:
-        raise(e)
-    else:
-        metadata_block = soup.find(id='series-data')
-        manga_dict = {
-            'title': str(metadata_block.find(class_="series-title").contents[0]).replace('</h1>','<h1>').replace('<h1>',''),
-            'author': str(metadata_block.find(class_="series-author").contents[0]).lstrip().rstrip(),
-            'cover': metadata_block.find(class_='cover').find('img').get('src')
-        }
+    if len(os.listdir(html_dir_path)) == 0:
+        print('No HTML file found for validation')
+        return None
 
-        latest_chapter = soup.find(class_='full-chapters-list list-of-chapters').find_all('li')[0]
-        latest_chapter_dict = {
-            'link': 'https://mangalivre.net' + latest_chapter.find('a').get('href'),
-            'title': latest_chapter.find('a').get('title').replace('Ler ',''),
-            'releaseDate': latest_chapter.find(class_='chapter-date').contents[0],
-            'chapterName': get_chapter_title(latest_chapter),
-        }
-        if latest_chapter_dict['chapterName'] is not None:
-            latest_chapter_dict['title'] = latest_chapter_dict['title'] + ' - ' + latest_chapter_dict['chapterName']
 
-        if latest_chapter_dict['releaseDate'].lower() == 'hoje' or \
-            latest_chapter_dict['releaseDate'].lower() == 'ontem':
+    for path in os.listdir(html_dir_path):
+        try:
+            html = open(os.path.join(html_dir_path, path), encoding="utf8")
+            soup = BeautifulSoup(html, 'html.parser')
+        except Exception as e:
+            raise(e)
+        else:
+            metadata_block = soup.find(id='series-data')
+            manga_dict = {
+                'title': str(metadata_block.find(class_="series-title").contents[0]).replace('</h1>','<h1>').replace('<h1>',''),
+                'author': str(metadata_block.find(class_="series-author").contents[0]).lstrip().rstrip(),
+                'cover': metadata_block.find(class_='cover').find('img').get('src')
+            }
 
-            if storage_usage:
-                if manga_dict['title'] not in notification_cache['mangas']:
-                    notification_cache['mangas'][manga_dict["title"]] = {}
-                
-                if latest_chapter_dict['title'] not in notification_cache['mangas'][manga_dict["title"]]:
-                    print(f"{manga_dict['title']}: {latest_chapter_dict['title']} was not notified yet. Sending notification.")
-                    notification_cache['mangas'][manga_dict["title"]][latest_chapter_dict['title']] = send_notification(manga_dict, latest_chapter_dict)
+            latest_chapter = soup.find(class_='full-chapters-list list-of-chapters').find_all('li')[0]
+            latest_chapter_dict = {
+                'link': 'https://mangalivre.net' + latest_chapter.find('a').get('href'),
+                'title': latest_chapter.find('a').get('title').replace('Ler ',''),
+                'releaseDate': latest_chapter.find(class_='chapter-date').contents[0],
+                'chapterName': get_chapter_title(latest_chapter),
+            }
+            if latest_chapter_dict['chapterName'] is not None:
+                latest_chapter_dict['title'] = latest_chapter_dict['title'] + ' - ' + latest_chapter_dict['chapterName']
+
+            if latest_chapter_dict['releaseDate'].lower() == 'hoje' or \
+                latest_chapter_dict['releaseDate'].lower() == 'ontem':
+
+                if storage_usage:
+                    if manga_dict['title'] not in notification_cache['mangas']:
+                        notification_cache['mangas'][manga_dict["title"]] = {}
+                    
+                    if latest_chapter_dict['title'] not in notification_cache['mangas'][manga_dict["title"]]:
+                        print(f"{manga_dict['title']}: {latest_chapter_dict['title']} was not notified yet. Sending notification.")
+                        notification_cache['mangas'][manga_dict["title"]][latest_chapter_dict['title']] = send_notification(manga_dict, latest_chapter_dict, email_configs)
+                    else:
+                        print(f"{manga_dict['title']}: {latest_chapter_dict['title']} was already notified. Skipping it.")
                 else:
-                    print(f"{manga_dict['title']}: {latest_chapter_dict['title']} was already notified. Skipping it.")
-            else:
-                print(f"Sending notification about {manga_dict['title']}: {latest_chapter_dict['title']}")
-                send_notification(manga_dict, latest_chapter_dict)
+                    print(f"Sending notification about {manga_dict['title']}: {latest_chapter_dict['title']}")
+                    send_notification(manga_dict, latest_chapter_dict, email_configs)
 
 
-# Updating cache
-if storage_usage:
-    with open(storage_location, 'w') as outfile:  
-        json.dump(notification_cache, outfile)
+    # Updating cache
+    if storage_usage:
+        with open(storage_location, 'w') as outfile:  
+            json.dump(notification_cache, outfile)
+
+
+if __name__ == '__main__':
+    main()
