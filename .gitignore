@@ -1,4 +1,5 @@
-conf/email.json
+conf/app_conf.json
+storage/cache.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

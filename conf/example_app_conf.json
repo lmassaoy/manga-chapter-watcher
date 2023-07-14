@@ -1,0 +1,11 @@
+{
+    "storage": {
+        "storeExecutions": true,
+        "location": "./storage/cache.json"
+    },
+    "email": {
+        "sender": "my-email@gmail.com",
+        "receiver": "my-email@gmail.com",
+        "password": "aaaaabbbbccccc"
+    }
+}

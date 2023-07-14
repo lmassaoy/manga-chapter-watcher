@@ -19,9 +19,8 @@ def main():
         os.mkdir(html_dir_path)
 
     search_for_new_chapter('https://mangalivre.net/manga/black-clover/1751')
-    search_for_new_chapter('https://mangalivre.net/manga/doku-doku-mori-mori/17358')
-    search_for_new_chapter('https://mangalivre.net/manga/my-dragon-system/17292')
-    search_for_new_chapter('https://mangalivre.net/manga/golden-kamuy/2455')
+    search_for_new_chapter('https://mangalivre.net/manga/chainsaw-man/7739')
+    search_for_new_chapter('https://mangalivre.net/manga/jujutsu-kaisen/7178')
 
 
 if __name__ == '__main__':
