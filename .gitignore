@@ -1,6 +1,6 @@
 conf/app_conf.json
 storage/cache.json
-staging_html_objects/*
+staging_html_objects/*.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
