@@ -1,6 +1,7 @@
 conf/app_conf.json
 storage/cache.json
 staging_html_objects/*.html
+windows_scheduled_task.sh
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
