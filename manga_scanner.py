@@ -2,49 +2,29 @@ from bs4 import BeautifulSoup
 import os
 import json
 import smtplib, ssl
-from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from utils.chrome_html_downloader import HtmlDownloader
 
-
-port = 465
-smtp_server = 'smtp.gmail.com'
-html_dir_path = './staging_html_objects/'
-
-'''
-remember to create a config json object inside of the path `./conf/`
-model:
-{
-    "storage": {
-        "storeExecutions": true,
-        "location": "./storage/cache.json"
-    },
-    "email": {
-        "sender": "my-email@gmail.com",
-        "receiver": "my-email@gmail.com",
-        "password": "aaaaabbbbccccc"
-    }
-}
-
-important notes:
-- if `storeExecutions` is true, then `location` needs to be informed passing the path of the storage json object
-- create an app password for your gmail to attach to this application
-
-'''
 
 def load_configs():
     app_configs = json.load(open('./conf/app_conf.json'))
 
+    mangas_list = app_configs['mangasList']
+    html_dir_path = app_configs['general']['htmlDirPath']
     storage_usage = app_configs['storage']['storeExecutions']
     if 'location' in app_configs['storage']:
         storage_location = app_configs['storage']['location']
     else:
         storage_location = None
+    port = app_configs['email']['port']
+    smtp_server = app_configs['email']['smtpServer']
     sender_email = app_configs['email']['sender']
     receiver_email = app_configs['email']['receiver']
     email_password = app_configs['email']['password']
 
-    return storage_usage, storage_location, sender_email, receiver_email, email_password
+
+    return mangas_list, html_dir_path, storage_usage, storage_location, port, smtp_server, sender_email, receiver_email, email_password
 
 
 def load_cache_file(storage_location):
@@ -75,6 +55,28 @@ def get_chapter_title(chapter):
         return None
 
 
+def get_manga_and_latest_chapter(soup):
+    metadata_block = soup.find(id='series-data')
+    manga_dict = {
+        'title': str(metadata_block.find(class_="series-title").contents[0]).replace('</h1>','<h1>').replace('<h1>',''),
+        'author': str(metadata_block.find(class_="series-author").contents[0]).lstrip().rstrip(),
+        'cover': metadata_block.find(class_='cover').find('img').get('src')
+    }
+
+    latest_chapter = soup.find(class_='full-chapters-list list-of-chapters').find_all('li')[0]
+    latest_chapter_dict = {
+        'link': 'https://mangalivre.net' + latest_chapter.find('a').get('href'),
+        'title': latest_chapter.find('a').get('title').replace('Ler ',''),
+        'releaseDate': latest_chapter.find(class_='chapter-date').contents[0],
+        'chapterName': get_chapter_title(latest_chapter),
+    }
+
+    if latest_chapter_dict['chapterName'] is not None:
+        latest_chapter_dict['title'] = latest_chapter_dict['title'] + ' - ' + latest_chapter_dict['chapterName']
+
+    return manga_dict, latest_chapter_dict
+
+
 def send_notification(manga_dict, latest_chapter_dict, email_configs):
     sender_email = email_configs['sender']
     receiver_email = email_configs['receiver']
@@ -86,7 +88,7 @@ def send_notification(manga_dict, latest_chapter_dict, email_configs):
         message['From'] = sender_email
         message['To'] = receiver_email
 
-        body = open('./utils/email_template_html.html', encoding='utf-8').read()
+        body = open('./utils/email_template.html', encoding='utf-8').read()
         body = body.replace('{manga_title}', manga_dict['title'])\
                     .replace('{manga_cover}', manga_dict['cover'])\
                     .replace('{manga_chapter}', latest_chapter_dict['title'])\
@@ -105,8 +107,16 @@ def send_notification(manga_dict, latest_chapter_dict, email_configs):
 
 
 def main():
-    # Loading configs and storage
-    storage_usage, storage_location, sender_email, receiver_email, email_password = load_configs()
+    # Download HTML objects for web scraping
+    if os.path.exists(html_dir_path) is False:
+        os.mkdir(html_dir_path)
+
+    for manga in mangas_list:
+        downloader = HtmlDownloader(manga, html_dir_path)
+        downloader.search_for_new_chapter()
+    
+
+    # Loading e-mail and storage configs
     email_configs = { "sender": sender_email, "receiver": receiver_email, "password": email_password }
     if storage_usage:
         notification_cache = load_cache_file(storage_location)
@@ -119,6 +129,7 @@ def main():
         return None
 
 
+    # Checking if there's a new manga chapter to be notified
     for path in os.listdir(html_dir_path):
         try:
             html = open(os.path.join(html_dir_path, path), encoding="utf8")
@@ -126,22 +137,7 @@ def main():
         except Exception as e:
             raise(e)
         else:
-            metadata_block = soup.find(id='series-data')
-            manga_dict = {
-                'title': str(metadata_block.find(class_="series-title").contents[0]).replace('</h1>','<h1>').replace('<h1>',''),
-                'author': str(metadata_block.find(class_="series-author").contents[0]).lstrip().rstrip(),
-                'cover': metadata_block.find(class_='cover').find('img').get('src')
-            }
-
-            latest_chapter = soup.find(class_='full-chapters-list list-of-chapters').find_all('li')[0]
-            latest_chapter_dict = {
-                'link': 'https://mangalivre.net' + latest_chapter.find('a').get('href'),
-                'title': latest_chapter.find('a').get('title').replace('Ler ',''),
-                'releaseDate': latest_chapter.find(class_='chapter-date').contents[0],
-                'chapterName': get_chapter_title(latest_chapter),
-            }
-            if latest_chapter_dict['chapterName'] is not None:
-                latest_chapter_dict['title'] = latest_chapter_dict['title'] + ' - ' + latest_chapter_dict['chapterName']
+            manga_dict, latest_chapter_dict = get_manga_and_latest_chapter(soup)
 
             if latest_chapter_dict['releaseDate'].lower() == 'hoje' or \
                 latest_chapter_dict['releaseDate'].lower() == 'ontem':
@@ -167,4 +163,5 @@ def main():
 
 
 if __name__ == '__main__':
+    mangas_list, html_dir_path, storage_usage, storage_location, port, smtp_server, sender_email, receiver_email, email_password = load_configs()
     main()

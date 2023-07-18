@@ -4,8 +4,18 @@
         "location": "./storage/cache.json"
     },
     "email": {
+        "port": 465,
+        "smtpServer": "smtp.gmail.com",
         "sender": "my-email@gmail.com",
         "receiver": "my-email@gmail.com",
         "password": "aaaaabbbbccccc"
-    }
+    },
+    "general": {
+        "htmlDirPath": "./staging_html_objects/"
+    },
+    "mangasList": [
+        "https://mangalivre.net/manga/black-clover/1751",
+        "https://mangalivre.net/manga/chainsaw-man/7739",
+        "https://mangalivre.net/manga/jujutsu-kaisen/7178"
+    ]
 }
